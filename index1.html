@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>For You</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      height: 100vh;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        sans-serif;
+      background: radial-gradient(circle at top, #020617, #020617 40%, #02010a);
+      color: #f9fafb;
+      position: relative;
+    }
+
+    /* Canvas tim + sao + portal */
+    #canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* Orbs nền */
+    .orb {
+      position: fixed;
+      filter: blur(80px);
+      opacity: 0.8;
+      mix-blend-mode: screen;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb-1 {
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, #f97316, transparent 60%);
+      top: -120px; left: -80px;
+      animation: orbFloat1 18s ease-in-out infinite alternate;
+    }
+    .orb-2 {
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, #ec4899, transparent 60%);
+      bottom: -180px; right: -60px;
+      animation: orbFloat2 22s ease-in-out infinite alternate;
+    }
+    .orb-3 {
+      width: 420px; height: 420px;
+      background: radial-gradient(circle, #38bdf8, transparent 60%);
+      bottom: 12%; left: 50%;
+      transform: translateX(-50%);
+      animation: orbFloat3 26s ease-in-out infinite alternate;
+    }
+
+    @keyframes orbFloat1 {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(50px, 80px) scale(1.1); }
+    }
+    @keyframes orbFloat2 {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(-40px, -40px) scale(1.05); }
+    }
+    @keyframes orbFloat3 {
+      0% { transform: translate(-50%, 0) scale(1); }
+      100% { transform: translate(-48%, -50px) scale(1.08); }
+    }
+
+    /* Noise nhẹ */
+    .noise {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.08;
+      mix-blend-mode: soft-light;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='noStitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E");
+    }
+
+    /* Sparkles xung quanh tim */
+    .sparkle {
+      position: fixed;
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: radial-gradient(circle, #ffe4f7, transparent 70%);
+      box-shadow:
+        0 0 14px rgba(248, 113, 113, 0.9),
+        0 0 22px rgba(56, 189, 248, 0.9);
+      opacity: 0.8;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .sparkle.s1 { top: 52%; left: 48%; animation: sparkleOrbit1 7s linear infinite; }
+    .sparkle.s2 { top: 45%; left: 52%; animation: sparkleOrbit2 9s linear infinite; }
+    .sparkle.s3 { top: 50%; left: 56%; animation: sparkleOrbit3 6.5s linear infinite; }
+
+    @keyframes sparkleOrbit1 {
+      0%   { transform: translate(-40px, -40px); opacity: 0; }
+      10%  { opacity: 1; }
+      100% { transform: translate(40px, 30px); opacity: 0; }
+    }
+    @keyframes sparkleOrbit2 {
+      0%   { transform: translate(20px, -50px); opacity: 0; }
+      15%  { opacity: 1; }
+      100% { transform: translate(-40px, 50px); opacity: 0; }
+    }
+    @keyframes sparkleOrbit3 {
+      0%   { transform: translate(0, 40px); opacity: 0; }
+      20%  { opacity: 1; }
+      100% { transform: translate(50px, -30px); opacity: 0; }
+    }
+
+    /* Overlay tổng */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* Vòng glow nhỏ dưới trái tim (nhận diện màu tim) */
+    .heart-base {
+      position: fixed;
+      top: 58%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+    }
+    .heart-base-inner {
+      width: 180px;
+      height: 40px;
+      border-radius: 999px;
+      background:
+        radial-gradient(ellipse at center, rgba(252, 165, 165, 0.95), transparent 65%),
+        radial-gradient(ellipse at center, rgba(244, 63, 94, 0.8), transparent 70%);
+      filter: blur(1px);
+      box-shadow:
+        0 0 20px rgba(244, 63, 94, 0.9),
+        0 0 40px rgba(252, 165, 165, 0.8);
+      animation: basePulse 3s ease-in-out infinite;
+    }
+    @keyframes basePulse {
+      0%, 100% { transform: scaleX(1); opacity: 0.9; }
+      50% { transform: scaleX(1.16); opacity: 1; }
+    }
+    body.heart-formed .heart-base {
+      opacity: 1;
+      transform: translate(-50%, -48%);
+    }
+    body.heart-left .heart-base {
+      left: 30%;
+      transform: translate(-50%, -48%);
+    }
+
+    /* Khu chữ bên phải – sẽ hiện sau khi mở thư */
+    .right-overlay {
+      position: fixed;
+      top: 50%;
+      left: 72%;
+      transform: translate(-50%, -50%);
+      max-width: 380px;
+      z-index: 3;
+    }
+
+    #messageContainer {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.9s ease-out, transform 0.9s ease-out;
+      text-align: left;
+      pointer-events: none;
+    }
+    #messageContainer.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #apology {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #e5e7eb;
+      margin-bottom: 12px;
+    }
+
+    #afterLine {
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      font-size: 1.1rem;
+      background: linear-gradient(120deg, #ffe4f7, #ff8fb1, #ffd1dc, #f97316);
+      -webkit-background-clip: text;
+      color: transparent;
+      text-shadow:
+        0 0 20px rgba(248, 113, 113, 0.9),
+        0 0 36px rgba(56, 189, 248, 0.8);
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 10px;
+      margin-left: 2px;
+      animation: blink 0.8s steps(1, end) infinite;
+    }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      50.01%, 100% { opacity: 0; }
+    }
+
+    /* Ảnh cô ấy – ở giữa, xuất hiện cuối cùng */
+    #photoWrapper {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.85);
+      opacity: 0;
+      z-index: 3;
+      transition: opacity 0.9s ease-out, transform 0.9s ease-out;
+      pointer-events: none;
+    }
+    #photoWrapper img {
+      width: 150px;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 50%;
+      box-shadow:
+        0 18px 40px rgba(15, 23, 42, 0.95),
+        0 0 30px rgba(244, 114, 182, 0.9);
+      border: 3px solid rgba(248, 250, 252, 0.9);
+    }
+    #photoWrapper::before {
+      content: "";
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      border: 2px dashed rgba(248, 250, 252, 0.6);
+      box-shadow: 0 0 26px rgba(244, 63, 94, 0.9);
+      animation: photoRing 6s linear infinite;
+    }
+    @keyframes photoRing {
+      0%   { transform: rotate(0deg); opacity: 0.9; }
+      100% { transform: rotate(360deg); opacity: 0.9; }
+    }
+    body.show-photo #photoWrapper {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Nút OPEN */
+    #openBtn {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      padding: 11px 30px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      background-image: linear-gradient(135deg, #f97316, #ec4899, #38bdf8);
+      background-size: 180% 180%;
+      color: #020617;
+      box-shadow:
+        0 10px 28px rgba(15, 23, 42, 0.9),
+        0 0 26px rgba(244, 114, 182, 0.9);
+      transition: 0.25s ease;
+      pointer-events: auto;
+    }
+    #openBtn:hover {
+      transform: translateX(-50%) translateY(-1px) scale(1.03);
+      background-position: 100% 0;
+      box-shadow:
+        0 14px 36px rgba(15, 23, 42, 0.95),
+        0 0 40px rgba(244, 114, 182, 1);
+    }
+    #openBtn:active {
+      transform: translateX(-50%) translateY(1px) scale(0.98);
+      box-shadow:
+        0 6px 16px rgba(15, 23, 42, 0.9),
+        0 0 22px rgba(244, 114, 182, 0.9);
+    }
+    #openBtn.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(12px) scale(0.96);
+    }
+
+    /* Bì thư bên phải – xuất hiện sau khi tim di chuyển */
+    #letterWrapper {
+      position: fixed;
+      top: 50%;
+      left: 72%;
+      transform: translate(-50%, -50%) scale(0.95);
+      z-index: 3;
+      text-align: center;
+      cursor: pointer;
+      transition: opacity 0.6s ease, transform 0.6s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #letterWrapper.visible {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: auto;
+    }
+    #letterWrapper.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -60%) scale(0.9);
+    }
+
+    .envelope {
+      position: relative;
+      width: 230px;
+      height: 150px;
+      border-radius: 20px;
+      background: radial-gradient(circle at top left, #1f2937, #020617);
+      box-shadow:
+        0 20px 40px rgba(15, 23, 42, 1),
+        0 0 26px rgba(129, 140, 248, 0.8);
+      overflow: hidden;
+      transform-style: preserve-3d;
+      perspective: 700px;
+    }
+    .envelope-body {
+      position: absolute;
+      inset: 25% 0 0 0;
+      background: linear-gradient(135deg, #020617, #0b1120);
+    }
+    .envelope-flap {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #111827, #020617);
+      clip-path: polygon(0 0, 50% 60%, 100% 0);
+      transform-origin: top;
+      transform: rotateX(0deg);
+      transition: transform 0.6s ease;
+    }
+    body.letter-opening .envelope-flap {
+      transform: rotateX(-180deg);
+    }
+    .envelope-heart {
+      position: absolute;
+      top: 52%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.8rem;
+      text-shadow: 0 0 16px rgba(248, 113, 113, 0.9);
+    }
+    .letter-caption {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #e5e7eb;
+      opacity: 0.85;
+    }
+    .letter-caption span {
+      animation: blinkLetter 1.6s ease-in-out infinite;
+    }
+    @keyframes blinkLetter {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    @media (max-width: 768px) {
+      #letterWrapper {
+        top: 24%;
+        left: 50%;
+      }
+      .right-overlay {
+        top: 62%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        max-width: 90%;
+      }
+      #afterLine { font-size: 1rem; }
+      #apology { font-size: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Nền -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="noise"></div>
+
+  <!-- Canvas -->
+  <canvas id="canvas"></canvas>
+
+  <!-- Sparkles quanh tim -->
+  <div class="sparkle s1"></div>
+  <div class="sparkle s2"></div>
+  <div class="sparkle s3"></div>
+
+  <!-- Vòng glow nhỏ dưới trái tim -->
+  <div class="heart-base">
+    <div class="heart-base-inner"></div>
+  </div>
+
+  <!-- Khối chữ bên phải -->
+  <div class="overlay">
+    <div class="right-overlay">
+      <div id="messageContainer">
+        <p id="apology"></p>
+        <div id="afterLine"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ảnh em – xuất hiện sau cùng ở giữa -->
+  <div id="photoWrapper">
+    <!-- Đổi tên file tại đây nếu ảnh không phải co-ay.jpg -->
+    <img src="co-ay.jpg" alt="Ảnh của em">
+  </div>
+
+  <!-- Bì thư -->
+  <div id="letterWrapper">
+    <div class="envelope">
+      <div class="envelope-body"></div>
+      <div class="envelope-flap"></div>
+      <div class="envelope-heart">💌</div>
+    </div>
+    <div class="letter-caption">
+      <span>Nhấn vào bì thư để xem điều anh muốn nói</span>
+    </div>
+  </div>
+
+  <!-- Nút OPEN -->
+  <button id="openBtn">OPEN</button>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    const heartPoints = [];
+    let particles = [];
+    let starsFar = [];
+    let starsNear = [];
+    let portalActive = false;
+    let animationRunning = false;
+    let sequenceStart = null;
+    let currentCenterX = null;
+    let currentCenterY = null;
+
+    function heartShape(t) {
+      return {
+        x: 16 * Math.pow(Math.sin(t), 3),
+        y:
+          13 * Math.cos(t) -
+          5 * Math.cos(2 * t) -
+          2 * Math.cos(3 * t) -
+          Math.cos(4 * t),
+      };
+    }
+
+    function generateHeart() {
+      heartPoints.length = 0;
+      for (let i = 0; i < 360; i += 0.35) {
+        const t = (i * Math.PI) / 180;
+        const p = heartShape(t);
+        heartPoints.push({ baseX: p.x, baseY: -p.y });
+      }
+    }
+
+    function createStars() {
+      starsFar = [];
+      starsNear = [];
+      for (let i = 0; i < 140; i++) {
+        starsFar.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          speed: 0.1 + Math.random() * 0.3,
+          size: 0.8 + Math.random() * 0.8,
+        });
+      }
+      for (let i = 0; i < 70; i++) {
+        starsNear.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          speed: 0.3 + Math.random() * 0.6,
+          size: 1 + Math.random() * 1.2,
+        });
+      }
+    }
+    createStars();
+
+    class Particle {
+      constructor(point) {
+        this.baseX = point.baseX;
+        this.baseY = point.baseY;
+        this.x = canvas.width / 2;
+        this.y = canvas.height / 2;
+        this.size = Math.random() * 2.5 + 1.2;
+        this.speed = Math.random() * 0.08 + 0.04;
+      }
+
+      update(time) {
+        const centerX = currentCenterX ?? canvas.width / 2;
+        const centerY = currentCenterY ?? canvas.height / 2;
+
+        const globalScale = 13;
+        const beatScale = 1 + 0.08 * Math.sin(time * 4.2); // tim đập
+
+        const targetX = centerX + this.baseX * globalScale * beatScale;
+        const targetY = centerY + this.baseY * globalScale * beatScale;
+
+        this.x += (targetX - this.x) * this.speed;
+        this.y += (targetY - this.y) * this.speed;
+
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        const gradient = ctx.createRadialGradient(
+          this.x, this.y, 0,
+          this.x, this.y, this.size * 3
+        );
+        gradient.addColorStop(0, "rgba(255, 240, 245, 1)");
+        gradient.addColorStop(0.35, "rgba(248, 113, 113, 0.95)");
+        gradient.addColorStop(1, "rgba(244, 63, 94, 0)");
+        ctx.fillStyle = gradient;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = "rgba(248, 113, 113, 1)";
+        ctx.fill();
+      }
+    }
+
+    function drawStars(layer, alpha) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "#e5e7eb";
+      layer.forEach((s) => {
+        s.y += s.speed;
+        if (s.y > canvas.height + 10) {
+          s.y = -10;
+          s.x = Math.random() * canvas.width;
+        }
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    function drawPortal(time) {
+      if (!portalActive) return;
+      const centerX = currentCenterX ?? canvas.width / 2;
+      const centerY = currentCenterY ?? canvas.height / 2;
+
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      const baseRotation = time * 0.7;
+      ctx.rotate(baseRotation);
+
+      for (let i = 0; i < 3; i++) {
+        const radius = 90 + ((time * 60 + i * 60) % 160);
+        const alpha = 0.8 - i * 0.22;
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(244, 114, 182, ${alpha})`;
+        ctx.lineWidth = 3 - i * 0.8;
+        ctx.setLineDash([18, 26]);
+        ctx.lineDashOffset = -time * 80;
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function animate(timestamp) {
+      if (!animationRunning) return;
+      const time = timestamp / 1000;
+
+      if (!sequenceStart) sequenceStart = timestamp;
+      const elapsed = timestamp - sequenceStart;
+
+      // Center tim ban đầu, sau 2s bắt đầu trượt sang trái
+      const startX = canvas.width / 2;
+      const endX = canvas.width * 0.3;
+      if (elapsed <= 2000) {
+        currentCenterX = startX;
+      } else {
+        const t = Math.min((elapsed - 2000) / 1000, 1);
+        const ease = t * t * (3 - 2 * t); // easeInOut
+        currentCenterX = startX + (endX - startX) * ease;
+        if (t === 1) {
+          document.body.classList.add("heart-left");
+          // cho thư xuất hiện khi tim đã sang trái
+          document.getElementById("letterWrapper").classList.add("visible");
+        }
+      }
+      currentCenterY = canvas.height / 2;
+
+      // nền mờ
+      ctx.fillStyle = "rgba(3, 4, 12, 0.35)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      drawStars(starsFar, 0.45);
+      drawStars(starsNear, 0.9);
+      drawPortal(time);
+
+      particles.forEach((p) => p.update(time));
+
+      requestAnimationFrame(animate);
+    }
+
+    /* ---- TEXT & LETTER ---- */
+    const openBtn = document.getElementById("openBtn");
+    const letterWrapper = document.getElementById("letterWrapper");
+    const messageContainer = document.getElementById("messageContainer");
+    const apologyEl = document.getElementById("apology");
+    const afterLineEl = document.getElementById("afterLine");
+
+    function typeLine(element, text, speed, callback) {
+      let i = 0;
+      const cursor = document.createElement("span");
+      cursor.className = "cursor";
+      cursor.textContent = "|";
+      element.textContent = "";
+      element.appendChild(cursor);
+
+      const interval = setInterval(() => {
+        if (i < text.length) {
+          element.insertBefore(
+            document.createTextNode(text[i]),
+            cursor
+          );
+          i++;
+        } else {
+          clearInterval(interval);
+          cursor.remove();
+          if (callback) callback();
+        }
+      }, speed);
+    }
+
+    function showMessageSequence() {
+      messageContainer.classList.add("show");
+
+      const apologyText =
+        "Anh xin lỗi vì đã để em phải suy nghĩ nhiều, phải buồn và phải tự mình gồng lên với mọi thứ. Anh biết có những lúc anh vô tâm, nói những lời làm em tổn thương. Nhưng thật lòng anh chỉ muốn em cảm thấy an toàn, được yêu và được dựa vào anh. Nếu em cho phép, anh muốn dùng thời gian sau này để chứng minh rằng anh xứng đáng với nụ cười của em.";
+
+      apologyEl.textContent = apologyText;
+
+      const afterText = "Để e phải nghĩ nhiều rồi!";
+
+      setTimeout(() => {
+        typeLine(afterLineEl, afterText, 70, () => {
+          // sau khi gõ xong, show ảnh
+          setTimeout(() => {
+            document.body.classList.add("show-photo");
+          }, 700);
+        });
+      }, 600); // delay nhẹ sau khi block apology hiện
+    }
+
+    /* ---- OPEN SEQUENCE ---- */
+    openBtn.addEventListener("click", () => {
+      if (animationRunning) return;
+      openBtn.classList.add("hidden");
+
+      generateHeart();
+      createStars();
+      particles = heartPoints.map((p) => new Particle(p));
+      animationRunning = true;
+      sequenceStart = null;
+
+      document.body.classList.add("heart-formed");
+      portalActive = true;
+
+      requestAnimationFrame(animate);
+    });
+
+    /* ---- CLICK LETTER ---- */
+    letterWrapper.addEventListener("click", () => {
+      if (!animationRunning) return;
+      if (letterWrapper.classList.contains("hidden")) return;
+
+      document.body.classList.add("letter-opening");
+
+      setTimeout(() => {
+        letterWrapper.classList.add("hidden");
+        showMessageSequence();
+      }, 650);
+    });
+  </script>
+</body>
+</html>
